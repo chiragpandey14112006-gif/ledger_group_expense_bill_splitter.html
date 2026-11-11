@@ -1,0 +1,2524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ledger — Group Expense &amp; Bill Splitter</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f4f4f5;
+      color: #09090b;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    @media print {
+      body {
+        background-color: #ffffff;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-zinc-100 text-zinc-900 selection:bg-zinc-900 selection:text-white">
+  <!-- Top App Bar -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200 no-print">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-md bg-zinc-900 text-white flex items-center justify-center font-mono-num font-bold text-xs tracking-tight">
+          ÷
+        </div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-semibold tracking-tight text-zinc-900">Ledger</h1>
+          <span class="text-zinc-300">/</span>
+          <span id="active-workspace-label" class="text-xs font-medium text-zinc-600 truncate max-w-[160px] sm:max-w-xs">
+            Weekend Outings
+          </span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button
+          id="open-statement-btn"
+          type="button"
+          class="text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 px-2.5 py-1.5 rounded-md transition"
+        >
+          Statement &amp; Print
+        </button>
+
+        <button
+          id="sample-btn"
+          type="button"
+          class="text-xs font-medium text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200/70 px-2.5 py-1.5 rounded-md transition"
+        >
+          Fill sample dinner
+        </button>
+
+        <div class="relative flex items-center">
+          <label for="currency-select" class="sr-only">Currency</label>
+          <select
+            id="currency-select"
+            class="appearance-none rounded-md border border-zinc-200 bg-white pl-2.5 pr-7 py-1 text-xs font-mono-num font-medium text-zinc-700 hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 cursor-pointer"
+          >
+            <option value="₹">INR (₹)</option>
+            <option value="$">USD ($)</option>
+            <option value="€">EUR (€)</option>
+            <option value="£">GBP (£)</option>
+          </select>
+          <svg class="w-3.5 h-3.5 text-zinc-400 pointer-events-none absolute right-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toast Notification -->
+  <div
+    id="toast-banner"
+    class="fixed bottom-5 right-5 z-50 hidden items-center gap-2 rounded-lg bg-zinc-900 px-3.5 py-2.5 text-xs font-medium text-white shadow-lg border border-zinc-800 no-print"
+  >
+    <span id="toast-text">Saved</span>
+  </div>
+
+  <!-- Step 3 Feature: Printable & Shareable Statement Modal -->
+  <div
+    id="statement-modal"
+    class="fixed inset-0 z-40 hidden items-center justify-center bg-zinc-950/60 backdrop-blur-xs p-4 overflow-y-auto"
+  >
+    <div class="bg-white rounded-xl border border-zinc-200 shadow-xl max-w-2xl w-full overflow-hidden my-8">
+      <div class="px-6 py-4 bg-zinc-950 text-white flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-mono-num uppercase tracking-widest text-zinc-400 block">Official Group Statement</span>
+          <h2 id="statement-modal-title" class="text-base font-semibold mt-0.5">Weekend Outings</h2>
+        </div>
+        <div class="flex items-center gap-2 no-print">
+          <button
+            id="copy-full-statement-btn"
+            type="button"
+            class="text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 px-3 py-1.5 rounded-md transition"
+          >
+            Copy Full Report
+          </button>
+          <button
+            id="print-statement-btn"
+            type="button"
+            class="text-xs font-medium bg-white hover:bg-zinc-100 text-zinc-900 px-3 py-1.5 rounded-md transition"
+          >
+            Print / PDF
+          </button>
+          <button
+            id="close-statement-btn"
+            type="button"
+            aria-label="Close statement"
+            class="text-xs text-zinc-400 hover:text-white px-2 py-1 rounded transition"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <div id="statement-modal-body" class="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-xs"></div>
+    </div>
+  </div>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- Step 3 Feature: Multi-Trip / Event Workspace Switcher -->
+    <section class="bg-white rounded-xl border border-zinc-200/90 p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 no-print">
+      <div class="flex items-center gap-2 overflow-x-auto py-0.5">
+        <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 shrink-0 mr-1">Workspaces:</span>
+        <div id="workspace-tabs-container" class="flex items-center gap-1.5"></div>
+      </div>
+
+      <form id="new-workspace-form" class="flex items-center gap-2 shrink-0" novalidate>
+        <input
+          id="new-workspace-input"
+          type="text"
+          maxlength="28"
+          placeholder="New trip or group (e.g., Manali Trip)..."
+          aria-label="New workspace name"
+          class="w-48 sm:w-56 rounded-lg border border-zinc-200 bg-zinc-50/60 focus:bg-white px-3 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none transition"
+        />
+        <button
+          id="create-workspace-btn"
+          type="submit"
+          class="rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-medium px-3 py-1.5 transition"
+        >
+          + New Group
+        </button>
+      </form>
+    </section>
+
+    <!-- Group Members Bar -->
+    <section class="bg-white rounded-xl border border-zinc-200/90 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Participants</h2>
+          <span id="member-count-pill" class="text-[11px] font-mono-num bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-medium">4 active</span>
+        </div>
+        <div id="member-chips-container" class="flex flex-wrap items-center gap-1.5 pt-1"></div>
+      </div>
+
+      <form id="add-member-form" class="flex items-center gap-2 shrink-0" novalidate>
+        <input
+          id="new-member-input"
+          type="text"
+          maxlength="24"
+          placeholder="Add person (e.g., Kabir)..."
+          aria-label="New participant name"
+          class="w-44 sm:w-52 rounded-lg border border-zinc-200 bg-zinc-50/60 focus:bg-white px-3 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none transition"
+        />
+        <button
+          id="add-member-btn"
+          type="submit"
+          class="rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium px-3 py-1.5 transition"
+        >
+          + Add Person
+        </button>
+      </form>
+    </section>
+
+    <!-- Primary Workbench: Left Entry Form + Right Live Receipt & Balances -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <!-- Left Column: Bill & Split Configuration -->
+      <section class="lg:col-span-7 bg-white rounded-xl border border-zinc-200/90 overflow-hidden no-print">
+        <div class="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-zinc-900">New Expense Entry</h2>
+            <p class="text-xs text-zinc-500">Configure bill amount, itemized dishes, taxes, payer, and participant shares.</p>
+          </div>
+          <span id="edit-mode-badge" class="hidden text-[11px] font-mono-num font-medium bg-amber-100 text-amber-900 px-2 py-0.5 rounded">
+            Editing Entry
+          </span>
+        </div>
+
+        <form id="expense-form" class="p-5 space-y-5" novalidate>
+          <!-- Row 1: Description, Category, Paid By -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+            <div class="sm:col-span-6">
+              <label for="expense-title" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Expense Description
+              </label>
+              <input
+                id="expense-title"
+                type="text"
+                placeholder="e.g., Dinner at Dastarkhwan, Uber Intercity"
+                class="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition"
+              />
+            </div>
+
+            <div class="sm:col-span-3">
+              <label for="expense-category" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Category
+              </label>
+              <select
+                id="expense-category"
+                class="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-sm text-zinc-800 focus:border-zinc-900 focus:outline-none"
+              >
+                <option value="Dining">Dining</option>
+                <option value="Transport">Transport</option>
+                <option value="Groceries">Groceries</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Stay">Stay &amp; Hotel</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="sm:col-span-3">
+              <label for="paid-by-select" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Paid By
+              </label>
+              <select
+                id="paid-by-select"
+                class="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-sm font-medium text-zinc-900 focus:border-zinc-900 focus:outline-none"
+              ></select>
+            </div>
+          </div>
+
+          <!-- Row 2: Subtotal, Discount, Headcount Stepper -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+            <div class="sm:col-span-5">
+              <div class="flex items-center justify-between mb-1.5">
+                <label for="bill-amount" class="block text-xs font-medium text-zinc-700">
+                  Subtotal (<span class="currency-symbol">₹</span>)
+                </label>
+                <span id="subtotal-locked-badge" class="hidden text-[10px] font-mono-num text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                  Auto-summed from items
+                </span>
+              </div>
+              <div class="relative flex items-center">
+                <span class="currency-symbol absolute left-3 text-sm font-mono-num text-zinc-400 select-none">₹</span>
+                <input
+                  id="bill-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="1600"
+                  placeholder="0.00"
+                  class="w-full rounded-lg border border-zinc-200 bg-white pl-7 pr-3 py-2 text-sm font-mono-num font-semibold text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 transition"
+                />
+              </div>
+            </div>
+
+            <div class="sm:col-span-3">
+              <label for="discount-amount" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Discount (<span class="currency-symbol">₹</span>)
+              </label>
+              <div class="relative flex items-center">
+                <span class="currency-symbol absolute left-2.5 text-xs font-mono-num text-zinc-400 select-none">₹</span>
+                <input
+                  id="discount-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value="0"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-zinc-200 bg-white pl-6 pr-2.5 py-2 text-sm font-mono-num text-zinc-800 focus:border-zinc-900 focus:outline-none transition"
+                />
+              </div>
+            </div>
+
+            <div class="sm:col-span-4">
+              <label for="people-count" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Total People
+              </label>
+              <div class="flex items-center rounded-lg border border-zinc-200 bg-white overflow-hidden">
+                <button
+                  id="decrease-people"
+                  type="button"
+                  aria-label="Decrease people"
+                  class="px-3 py-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 font-mono-num text-sm font-semibold transition border-r border-zinc-200"
+                >
+                  −
+                </button>
+                <input
+                  id="people-count"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value="4"
+                  class="w-full text-center py-2 text-sm font-mono-num font-semibold text-zinc-900 focus:outline-none"
+                />
+                <button
+                  id="increase-people"
+                  type="button"
+                  aria-label="Increase people"
+                  class="px-3 py-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 font-mono-num text-sm font-semibold transition border-l border-zinc-200"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 3: Tax / Tip / GST Selector -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="custom-tip-input" class="text-xs font-medium text-zinc-700">
+                Tax, GST, or Service Charge (%)
+              </label>
+              <span id="tip-Label" class="text-xs font-mono-num font-semibold text-zinc-700">5%</span>
+            </div>
+            <div class="grid grid-cols-6 gap-1.5">
+              <button type="button" data-tip="0" class="tip-btn py-1.5 rounded-lg text-xs font-mono-num font-medium border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 transition">0%</button>
+              <button type="button" data-tip="5" class="tip-btn py-1.5 rounded-lg text-xs font-mono-num font-medium border border-zinc-900 bg-zinc-900 text-white transition">5%</button>
+              <button type="button" data-tip="10" class="tip-btn py-1.5 rounded-lg text-xs font-mono-num font-medium border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 transition">10%</button>
+              <button type="button" data-tip="15" class="tip-btn py-1.5 rounded-lg text-xs font-mono-num font-medium border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 transition">15%</button>
+              <button type="button" data-tip="18" class="tip-btn py-1.5 rounded-lg text-xs font-mono-num font-medium border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 transition">18%</button>
+              <div class="relative flex items-center">
+                <input
+                  id="custom-tip-input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  placeholder="Custom"
+                  aria-label="Custom tax percentage"
+                  class="w-full rounded-lg border border-zinc-200 bg-white pl-2 pr-4 py-1.5 text-xs font-mono-num text-zinc-800 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none"
+                />
+                <span class="absolute right-1.5 text-[10px] font-mono-num text-zinc-400 pointer-events-none">%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 4: Split Method (Equal vs Exact vs Shares vs Receipt Items) -->
+          <div class="space-y-3 pt-2 border-t border-zinc-100">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span class="text-xs font-medium text-zinc-700">Split Mode</span>
+              <div class="inline-flex flex-wrap rounded-lg border border-zinc-200 p-0.5 bg-zinc-100/80 self-start gap-0.5">
+                <button type="button" data-mode="equal" class="split-mode-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white text-zinc-900 shadow-2xs transition">
+                  Equal Split
+                </button>
+                <button type="button" data-mode="items" class="split-mode-btn px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:text-zinc-900 transition">
+                  Receipt Items
+                </button>
+                <button type="button" data-mode="exact" class="split-mode-btn px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:text-zinc-900 transition">
+                  Exact Amounts
+                </button>
+                <button type="button" data-mode="shares" class="split-mode-btn px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:text-zinc-900 transition">
+                  By Shares (1x, 2x)
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 2 Feature: Itemized Receipt Builder Panel -->
+            <div id="receipt-items-panel" class="hidden rounded-xl border border-zinc-200 bg-zinc-50/70 p-3.5 space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <h3 class="text-xs font-semibold text-zinc-900">Itemized Receipt Lines</h3>
+                  <p class="text-[11px] text-zinc-500">Add dishes or items and tap who shared each one. Tax &amp; discount split proportionally.</p>
+                </div>
+                <button
+                  id="load-sample-receipt-btn"
+                  type="button"
+                  class="shrink-0 text-[11px] font-medium text-zinc-700 hover:text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-100 px-2.5 py-1 rounded-md transition"
+                >
+                  Load 4-Item Receipt
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div class="sm:col-span-6">
+                  <input
+                    id="new-item-name"
+                    type="text"
+                    placeholder="Dish or item (e.g., Butter Chicken)"
+                    aria-label="Receipt item name"
+                    class="w-full rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none"
+                  />
+                </div>
+                <div class="sm:col-span-3 relative flex items-center">
+                  <span class="currency-symbol absolute left-2.5 text-xs font-mono-num text-zinc-400 select-none">₹</span>
+                  <input
+                    id="new-item-price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Price"
+                    aria-label="Receipt item price"
+                    class="w-full rounded-lg border border-zinc-200 bg-white pl-6 pr-2 py-1.5 text-xs font-mono-num font-semibold text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none"
+                  />
+                </div>
+                <div class="sm:col-span-3">
+                  <button
+                    id="add-receipt-item-btn"
+                    type="button"
+                    class="w-full h-full rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium py-1.5 px-3 transition"
+                  >
+                    + Add Line
+                  </button>
+                </div>
+              </div>
+
+              <div id="receipt-items-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Per-Participant Breakdown Grid -->
+            <div id="participant-split-rows" class="rounded-lg border border-zinc-200/80 bg-zinc-50/50 divide-y divide-zinc-200/60"></div>
+
+            <!-- Rounding Bar -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+              <span class="text-xs text-zinc-500">Per-person rounding</span>
+              <div class="inline-flex rounded-lg border border-zinc-200 p-0.5 bg-zinc-100/80 self-start">
+                <button type="button" data-round="exact" class="round-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white text-zinc-900 shadow-2xs transition">
+                  Exact (.00)
+                </button>
+                <button type="button" data-round="nearest1" class="round-btn px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:text-zinc-900 transition">
+                  Nearest 1
+                </button>
+                <button type="button" data-round="up10" class="round-btn px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:text-zinc-900 transition">
+                  Round Up 10
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="form-feedback" class="hidden rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700 font-medium"></div>
+
+          <div class="pt-1 flex items-center gap-2.5">
+            <button
+              id="add-expense-btn"
+              type="submit"
+              class="flex-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-950 text-white font-medium text-xs sm:text-sm py-2.5 px-4 shadow-xs transition"
+            >
+              + Save to Expense Log
+            </button>
+            <button
+              id="reset-form-btn"
+              type="button"
+              class="rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 font-medium text-xs sm:text-sm py-2.5 px-3.5 transition"
+            >
+              Clear
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Right Column: Live Split Receipt + Settlement Plan + Category Analytics -->
+      <div class="lg:col-span-5 space-y-6">
+        <!-- Dark Live Receipt Card -->
+        <section class="bg-zinc-950 text-zinc-100 rounded-xl border border-zinc-800 shadow-sm overflow-hidden no-print">
+          <div class="p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div>
+                <span class="text-[10px] font-mono-num uppercase tracking-widest text-zinc-400 block">Live Calculation</span>
+                <h2 id="live-receipt-title" class="text-sm font-semibold text-white mt-0.5 truncate max-w-[210px]">
+                  Current Bill
+                </h2>
+              </div>
+              <span id="live-people-badge" class="text-xs font-mono-num bg-zinc-800 text-zinc-200 border border-zinc-700 px-2.5 py-0.5 rounded">
+                4 people
+              </span>
+            </div>
+
+            <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex items-baseline justify-between">
+              <div>
+                <span id="per-person-label" class="text-xs text-zinc-400 block">Each person pays</span>
+                <span id="rounding-note" class="text-[11px] text-emerald-400 font-mono-num hidden mt-0.5 block"></span>
+              </div>
+              <div class="text-right font-mono-num">
+                <span class="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                  <span class="currency-symbol">₹</span><span id="per-person-display">420.00</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Itemized Breakdown -->
+            <div class="space-y-1.5 text-xs font-mono-num">
+              <div class="flex justify-between text-zinc-400">
+                <span>Subtotal</span>
+                <span class="text-zinc-200"><span class="currency-symbol">₹</span><span id="base-bill-display">1600.00</span></span>
+              </div>
+              <div id="discount-row" class="hidden justify-between text-emerald-400">
+                <span>Discount</span>
+                <span>−<span class="currency-symbol">₹</span><span id="discount-display">0.00</span></span>
+              </div>
+              <div class="flex justify-between text-zinc-400">
+                <span>Tax / Charge (<span id="tip-percent-display">5</span>%)</span>
+                <span class="text-zinc-200">+<span class="currency-symbol">₹</span><span id="tip-amount-display">80.00</span></span>
+              </div>
+              <div class="border-t border-zinc-800 pt-2 flex justify-between text-sm font-semibold text-white">
+                <span>Net Bill Total</span>
+                <span><span class="currency-symbol">₹</span><span id="total-bill-display">1680.00</span></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-zinc-900/80 border-t border-zinc-800 px-5 py-3 flex items-center justify-between gap-2">
+            <span class="text-[11px] text-zinc-400">Share breakdown via WhatsApp / UPI</span>
+            <button
+              id="copy-summary-btn"
+              type="button"
+              class="rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-100 transition"
+            >
+              Copy Split Text
+            </button>
+          </div>
+        </section>
+
+        <!-- Settlement Engine Card: Who Owes Whom -->
+        <section class="bg-white rounded-xl border border-zinc-200/90 p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-semibold text-zinc-900">Settlement Plan</h2>
+              <p class="text-xs text-zinc-500">Minimum transfers needed to settle all logged bills.</p>
+            </div>
+            <button
+              id="copy-settlement-btn"
+              type="button"
+              class="text-xs font-medium text-zinc-700 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-md px-2.5 py-1 transition no-print"
+            >
+              Copy Plan
+            </button>
+          </div>
+
+          <!-- Member Net Balances Strip -->
+          <div id="member-balances-list" class="grid grid-cols-2 gap-2"></div>
+
+          <!-- Suggested Transfers -->
+          <div class="pt-2 border-t border-zinc-100">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block mb-2">Recommended Transfers</span>
+            <div id="settlement-transfers-list" class="space-y-2"></div>
+          </div>
+        </section>
+
+        <!-- Step 2 Feature: Category Spend Analytics Card -->
+        <section class="bg-white rounded-xl border border-zinc-200/90 p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-semibold text-zinc-900">Category Spend Breakdown</h2>
+              <p class="text-xs text-zinc-500">Distribution of group expenses across categories.</p>
+            </div>
+            <span id="top-payer-badge" class="text-[11px] font-mono-num bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-medium">
+              Top Payer: Aarav
+            </span>
+          </div>
+
+          <div id="category-stacked-bar" class="h-2.5 w-full rounded-full bg-zinc-100 overflow-hidden flex"></div>
+
+          <div id="category-breakdown-list" class="space-y-2"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Step 3 Feature: Per-Person Accounting Matrix (Paid Up Front vs. Consumed vs. Net Position) -->
+    <section class="bg-white rounded-xl border border-zinc-200/90 overflow-hidden">
+      <div class="p-5 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-semibold text-zinc-900">Participant Spend Matrix</h2>
+          <p class="text-xs text-zinc-500">Comparison of how much each person paid at the register versus their actual consumed share.</p>
+        </div>
+        <span id="matrix-avg-badge" class="text-xs font-mono-num bg-zinc-100 text-zinc-700 px-2.5 py-1 rounded-md font-medium self-start sm:self-center">
+          Avg Consumed: ₹580.00
+        </span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-zinc-100 bg-zinc-50/70 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+              <th class="py-2.5 px-5">Participant</th>
+              <th class="py-2.5 px-4 text-right">Paid Up Front</th>
+              <th class="py-2.5 px-4 text-right">Share Consumed</th>
+              <th class="py-2.5 px-4 text-right">Net Position</th>
+              <th class="py-2.5 px-5 w-44 hidden sm:table-cell">Paid vs. Consumed</th>
+            </tr>
+          </thead>
+          <tbody id="participant-matrix-body" class="divide-y divide-zinc-100 text-xs"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Bottom Ledger Table -->
+    <section class="bg-white rounded-xl border border-zinc-200/90 overflow-hidden">
+      <div class="p-5 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-zinc-900">Expense Ledger</h2>
+            <span id="ledger-count-badge" class="text-[11px] font-mono-num bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-medium">
+              2 entries
+            </span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-0.5">Full audit trail of group bills, payers, and individual splits.</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="text-right">
+            <span class="text-[10px] uppercase tracking-wider text-zinc-400 block">Total Group Spend</span>
+            <span class="text-sm font-mono-num font-bold text-zinc-900">
+              <span class="currency-symbol">₹</span><span id="grand-total-display">2320.00</span>
+            </span>
+          </div>
+          <div class="flex items-center gap-2 no-print">
+            <button
+              id="export-csv-btn"
+              type="button"
+              class="text-xs font-medium text-zinc-700 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-md px-2.5 py-1.5 transition"
+            >
+              Export CSV
+            </button>
+            <button
+              id="clear-log-btn"
+              type="button"
+              class="text-xs font-medium text-rose-600 hover:text-rose-700 border border-rose-200 hover:bg-rose-50 rounded-md px-2.5 py-1.5 transition"
+            >
+              Clear Log
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="px-5 py-2.5 bg-zinc-50/70 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 no-print">
+        <div class="flex items-center gap-1.5 overflow-x-auto py-0.5">
+          <button type="button" data-filter="ALL" class="filter-chip px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-900 text-white transition">All</button>
+          <button type="button" data-filter="Dining" class="filter-chip px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:bg-zinc-200/60 transition">Dining</button>
+          <button type="button" data-filter="Transport" class="filter-chip px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:bg-zinc-200/60 transition">Transport</button>
+          <button type="button" data-filter="Groceries" class="filter-chip px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:bg-zinc-200/60 transition">Groceries</button>
+          <button type="button" data-filter="Utilities" class="filter-chip px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:bg-zinc-200/60 transition">Utilities</button>
+          <button type="button" data-filter="Stay" class="filter-chip px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:bg-zinc-200/60 transition">Stay</button>
+        </div>
+        <input
+          id="search-ledger-input"
+          type="text"
+          placeholder="Search description or payer..."
+          aria-label="Search ledger"
+          class="w-full sm:w-56 rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-800 placeholder-zinc-400 focus:border-zinc-900 focus:outline-none"
+        />
+      </div>
+
+      <div id="expense-list" class="divide-y divide-zinc-100"></div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'ledger_pro_state_v5';
+
+    const CATEGORY_COLORS = {
+      Dining: { bar: 'bg-zinc-900', dot: 'bg-zinc-900' },
+      Transport: { bar: 'bg-emerald-600', dot: 'bg-emerald-600' },
+      Groceries: { bar: 'bg-amber-500', dot: 'bg-amber-500' },
+      Utilities: { bar: 'bg-sky-600', dot: 'bg-sky-600' },
+      Stay: { bar: 'bg-violet-600', dot: 'bg-violet-600' },
+      Other: { bar: 'bg-rose-500', dot: 'bg-rose-500' }
+    };
+
+    const initialWorkspaces = {
+      weekend: {
+        id: 'weekend',
+        name: 'Weekend Outings',
+        currency: '₹',
+        members: ['Aarav', 'Priya', 'Rohan', 'Meera'],
+        expenses: [
+          {
+            id: 101,
+            title: 'Dinner at Dastarkhwan',
+            category: 'Dining',
+            paidBy: 'Aarav',
+            baseAmount: 1600,
+            discountAmount: 0,
+            tipPercent: 5,
+            totalAmount: 1680,
+            people: 4,
+            splitMode: 'items',
+            roundMode: 'exact',
+            perPerson: 420,
+            sharesByMember: { Aarav: 462, Priya: 378, Rohan: 462, Meera: 378 },
+            timestamp: 'Today, 8:40 PM'
+          },
+          {
+            id: 102,
+            title: 'Airport Cab & Toll',
+            category: 'Transport',
+            paidBy: 'Priya',
+            baseAmount: 640,
+            discountAmount: 0,
+            tipPercent: 0,
+            totalAmount: 640,
+            people: 4,
+            splitMode: 'equal',
+            roundMode: 'exact',
+            perPerson: 160,
+            sharesByMember: { Aarav: 160, Priya: 160, Rohan: 160, Meera: 160 },
+            timestamp: 'Today, 6:15 PM'
+          }
+        ]
+      },
+      goa: {
+        id: 'goa',
+        name: 'Goa Villa Trip',
+        currency: '₹',
+        members: ['Aarav', 'Priya', 'Kabir'],
+        expenses: [
+          {
+            id: 201,
+            title: 'Assagao Villa Deposit (2 Nights)',
+            category: 'Stay',
+            paidBy: 'Kabir',
+            baseAmount: 12000,
+            discountAmount: 0,
+            tipPercent: 0,
+            totalAmount: 12000,
+            people: 3,
+            splitMode: 'equal',
+            roundMode: 'exact',
+            perPerson: 4000,
+            sharesByMember: { Aarav: 4000, Priya: 4000, Kabir: 4000 },
+            timestamp: 'Yesterday, 4:10 PM'
+          },
+          {
+            id: 202,
+            title: 'Scooter Rentals & Fuel',
+            category: 'Transport',
+            paidBy: 'Aarav',
+            baseAmount: 1800,
+            discountAmount: 0,
+            tipPercent: 0,
+            totalAmount: 1800,
+            people: 3,
+            splitMode: 'equal',
+            roundMode: 'exact',
+            perPerson: 600,
+            sharesByMember: { Aarav: 600, Priya: 600, Kabir: 600 },
+            timestamp: 'Today, 11:20 AM'
+          }
+        ]
+      },
+      flat: {
+        id: 'flat',
+        name: 'Flatmates Monthly',
+        currency: '₹',
+        members: ['Rohan', 'Meera', 'Dev'],
+        expenses: [
+          {
+            id: 301,
+            title: 'High-Speed Fiber & Electricity',
+            category: 'Utilities',
+            paidBy: 'Meera',
+            baseAmount: 3450,
+            discountAmount: 0,
+            tipPercent: 0,
+            totalAmount: 3450,
+            people: 3,
+            splitMode: 'equal',
+            roundMode: 'exact',
+            perPerson: 1150,
+            sharesByMember: { Rohan: 1150, Meera: 1150, Dev: 1150 },
+            timestamp: 'Nov 5, 10:00 AM'
+          },
+          {
+            id: 302,
+            title: 'Weekly Kitchen Groceries',
+            category: 'Groceries',
+            paidBy: 'Rohan',
+            baseAmount: 2100,
+            discountAmount: 0,
+            tipPercent: 0,
+            totalAmount: 2100,
+            people: 3,
+            splitMode: 'equal',
+            roundMode: 'exact',
+            perPerson: 700,
+            sharesByMember: { Rohan: 700, Meera: 700, Dev: 700 },
+            timestamp: 'Nov 8, 7:30 PM'
+          }
+        ]
+      }
+    };
+
+    const defaultReceiptItems = [
+      { id: 1, name: 'Awadhi Mutton Biryani (Large)', price: 780, sharedBy: ['Aarav', 'Rohan'] },
+      { id: 2, name: 'Paneer Tikka Masala & Naan', price: 620, sharedBy: ['Priya', 'Meera'] },
+      { id: 3, name: 'Fresh Lime Soda (x4)', price: 200, sharedBy: ['Aarav', 'Priya', 'Rohan', 'Meera'] }
+    ];
+
+    const state = {
+      activeWorkspaceId: 'weekend',
+      workspaces: JSON.parse(JSON.stringify(initialWorkspaces)),
+      currency: '₹',
+      members: ['Aarav', 'Priya', 'Rohan', 'Meera'],
+      includedMembers: { Aarav: true, Priya: true, Rohan: true, Meera: true },
+      exactInputs: { Aarav: 420, Priya: 420, Rohan: 420, Meera: 420 },
+      shareWeights: { Aarav: 1, Priya: 1, Rohan: 1, Meera: 1 },
+      receiptItems: defaultReceiptItems.map((it) => ({ ...it, sharedBy: it.sharedBy.slice() })),
+      tipPercent: 5,
+      splitMode: 'equal',
+      roundMode: 'exact',
+      editingId: null,
+      activeCategoryFilter: 'ALL',
+      searchQuery: '',
+      expenses: []
+    };
+
+    function loadActiveWorkspaceIntoState() {
+      const ws = state.workspaces[state.activeWorkspaceId] || Object.values(state.workspaces)[0];
+      if (!ws) return;
+      state.activeWorkspaceId = ws.id;
+      state.currency = ws.currency || '₹';
+      state.members = ws.members.slice();
+      state.expenses = ws.expenses.slice();
+      state.includedMembers = {};
+      state.exactInputs = {};
+      state.shareWeights = {};
+      state.members.forEach((m) => {
+        state.includedMembers[m] = true;
+        state.exactInputs[m] = 400;
+        state.shareWeights[m] = 1;
+      });
+      state.editingId = null;
+    }
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.workspaces && Object.keys(parsed.workspaces).length > 0) {
+          state.workspaces = parsed.workspaces;
+          state.activeWorkspaceId = parsed.activeWorkspaceId || Object.keys(parsed.workspaces)[0];
+        }
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+
+    loadActiveWorkspaceIntoState();
+
+    function persistState() {
+      const currentWs = state.workspaces[state.activeWorkspaceId];
+      if (currentWs) {
+        currentWs.currency = state.currency;
+        currentWs.members = state.members.slice();
+        currentWs.expenses = state.expenses.slice();
+      }
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            activeWorkspaceId: state.activeWorkspaceId,
+            workspaces: state.workspaces
+          })
+        );
+      } catch (e) {
+        // Ignore storage errors
+      }
+    }
+
+    // --- DOM ELEMENTS ---
+    const activeWorkspaceLabel = document.getElementById('active-workspace-label');
+    const workspaceTabsContainer = document.getElementById('workspace-tabs-container');
+    const newWorkspaceForm = document.getElementById('new-workspace-form');
+    const newWorkspaceInput = document.getElementById('new-workspace-input');
+
+    const openStatementBtn = document.getElementById('open-statement-btn');
+    const statementModal = document.getElementById('statement-modal');
+    const statementModalTitle = document.getElementById('statement-modal-title');
+    const statementModalBody = document.getElementById('statement-modal-body');
+    const copyFullStatementBtn = document.getElementById('copy-full-statement-btn');
+    const printStatementBtn = document.getElementById('print-statement-btn');
+    const closeStatementBtn = document.getElementById('close-statement-btn');
+
+    const currencySelect = document.getElementById('currency-select');
+    const memberCountPill = document.getElementById('member-count-pill');
+    const memberChipsContainer = document.getElementById('member-chips-container');
+    const addMemberForm = document.getElementById('add-member-form');
+    const newMemberInput = document.getElementById('new-member-input');
+
+    const expenseForm = document.getElementById('expense-form');
+    const titleInput = document.getElementById('expense-title');
+    const categorySelect = document.getElementById('expense-category');
+    const paidBySelect = document.getElementById('paid-by-select');
+    const billInput = document.getElementById('bill-amount');
+    const subtotalLockedBadge = document.getElementById('subtotal-locked-badge');
+    const discountInput = document.getElementById('discount-amount');
+    const peopleInput = document.getElementById('people-count');
+    const decreasePeopleBtn = document.getElementById('decrease-people');
+    const increasePeopleBtn = document.getElementById('increase-people');
+    const tipButtons = document.querySelectorAll('.tip-btn');
+    const customTipInput = document.getElementById('custom-tip-input');
+    const tipLabel = document.getElementById('tip-Label');
+    const splitModeButtons = document.querySelectorAll('.split-mode-btn');
+    const receiptItemsPanel = document.getElementById('receipt-items-panel');
+    const loadSampleReceiptBtn = document.getElementById('load-sample-receipt-btn');
+    const newItemNameInput = document.getElementById('new-item-name');
+    const newItemPriceInput = document.getElementById('new-item-price');
+    const addReceiptItemBtn = document.getElementById('add-receipt-item-btn');
+    const receiptItemsList = document.getElementById('receipt-items-list');
+    const participantSplitRows = document.getElementById('participant-split-rows');
+    const roundButtons = document.querySelectorAll('.round-btn');
+    const sampleBtn = document.getElementById('sample-btn');
+    const resetFormBtn = document.getElementById('reset-form-btn');
+    const addExpenseBtn = document.getElementById('add-expense-btn');
+    const editModeBadge = document.getElementById('edit-mode-badge');
+    const formFeedback = document.getElementById('form-feedback');
+
+    const liveReceiptTitle = document.getElementById('live-receipt-title');
+    const perPersonLabel = document.getElementById('per-person-label');
+    const perPersonDisplay = document.getElementById('per-person-display');
+    const roundingNote = document.getElementById('rounding-note');
+    const baseBillDisplay = document.getElementById('base-bill-display');
+    const discountRow = document.getElementById('discount-row');
+    const discountDisplay = document.getElementById('discount-display');
+    const tipPercentDisplay = document.getElementById('tip-percent-display');
+    const tipAmountDisplay = document.getElementById('tip-amount-display');
+    const totalBillDisplay = document.getElementById('total-bill-display');
+    const livePeopleBadge = document.getElementById('live-people-badge');
+    const copySummaryBtn = document.getElementById('copy-summary-btn');
+
+    const memberBalancesList = document.getElementById('member-balances-list');
+    const settlementTransfersList = document.getElementById('settlement-transfers-list');
+    const copySettlementBtn = document.getElementById('copy-settlement-btn');
+
+    const topPayerBadge = document.getElementById('top-payer-badge');
+    const categoryStackedBar = document.getElementById('category-stacked-bar');
+    const categoryBreakdownList = document.getElementById('category-breakdown-list');
+
+    const matrixAvgBadge = document.getElementById('matrix-avg-badge');
+    const participantMatrixBody = document.getElementById('participant-matrix-body');
+
+    const expenseListEl = document.getElementById('expense-list');
+    const grandTotalDisplay = document.getElementById('grand-total-display');
+    const ledgerCountBadge = document.getElementById('ledger-count-badge');
+    const clearLogBtn = document.getElementById('clear-log-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    const filterChips = document.querySelectorAll('.filter-chip');
+    const searchLedgerInput = document.getElementById('search-ledger-input');
+    const toastBanner = document.getElementById('toast-banner');
+    const toastText = document.getElementById('toast-text');
+
+    let toastTimer = null;
+    function showToast(msg) {
+      toastText.textContent = msg;
+      toastBanner.classList.remove('hidden');
+      toastBanner.classList.add('flex');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastBanner.classList.add('hidden');
+        toastBanner.classList.remove('flex');
+      }, 2400);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function applyRounding(val, mode) {
+      if (mode === 'nearest1') return Math.round(val);
+      if (mode === 'up10') return Math.ceil(val / 10) * 10;
+      return val;
+    }
+
+    // --- RENDER WORKSPACE TABS ---
+    function renderWorkspacesBar() {
+      const wsList = Object.values(state.workspaces);
+      const currentWs = state.workspaces[state.activeWorkspaceId];
+      if (currentWs) {
+        activeWorkspaceLabel.textContent = currentWs.name;
+      }
+
+      workspaceTabsContainer.innerHTML = wsList
+        .map((ws) => {
+          const active = ws.id === state.activeWorkspaceId;
+          const canDelete = wsList.length > 1;
+          return `
+            <div class="inline-flex items-center rounded-lg border ${
+              active
+                ? 'bg-zinc-900 text-white border-zinc-900'
+                : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+            } transition">
+              <button
+                type="button"
+                data-switch-ws="${escapeHtml(ws.id)}"
+                class="px-2.5 py-1 text-xs font-medium truncate max-w-[150px]"
+              >
+                ${escapeHtml(ws.name)}
+              </button>
+              ${
+                canDelete
+                  ? `<button
+                      type="button"
+                      data-delete-ws="${escapeHtml(ws.id)}"
+                      title="Delete workspace"
+                      class="pr-2 pl-0.5 text-[10px] ${
+                        active ? 'text-zinc-400 hover:text-rose-300' : 'text-zinc-400 hover:text-rose-600'
+                      } transition"
+                    >✕</button>`
+                  : ''
+              }
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function renderMembersBar() {
+      memberCountPill.textContent = `${state.members.length} ${state.members.length === 1 ? 'person' : 'people'}`;
+      memberChipsContainer.innerHTML = state.members
+        .map(
+          (m) => `
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 text-zinc-800 border border-zinc-200/80">
+            <span>${escapeHtml(m)}</span>
+            ${
+              state.members.length > 1
+                ? `<button type="button" data-remove-member="${escapeHtml(m)}" class="text-zinc-400 hover:text-rose-600 transition" title="Remove ${escapeHtml(m)}">✕</button>`
+                : ''
+            }
+          </span>
+        `
+        )
+        .join('');
+
+      const currentPayer = paidBySelect.value;
+      paidBySelect.innerHTML = state.members
+        .map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
+        .join('');
+      if (state.members.includes(currentPayer)) {
+        paidBySelect.value = currentPayer;
+      }
+    }
+
+    function syncSubtotalFromReceiptItems() {
+      if (state.splitMode !== 'items') {
+        subtotalLockedBadge.classList.add('hidden');
+        return;
+      }
+      subtotalLockedBadge.classList.remove('hidden');
+      const sum = state.receiptItems.reduce((acc, it) => acc + (Number(it.price) || 0), 0);
+      billInput.value = String(sum.toFixed(2).replace(/\.00$/, ''));
+    }
+
+    function renderReceiptItemsEditor() {
+      if (state.splitMode !== 'items') {
+        receiptItemsPanel.classList.add('hidden');
+        return;
+      }
+      receiptItemsPanel.classList.remove('hidden');
+
+      if (state.receiptItems.length === 0) {
+        receiptItemsList.innerHTML = `
+          <div class="rounded-lg border border-dashed border-zinc-200 bg-white px-3 py-4 text-center text-xs text-zinc-400">
+            No receipt lines added yet. Enter a dish above or click <strong>Load 4-Item Receipt</strong>.
+          </div>
+        `;
+        return;
+      }
+
+      receiptItemsList.innerHTML = state.receiptItems
+        .map((item) => {
+          const validConsumers = item.sharedBy.filter((m) => state.members.includes(m));
+          const perConsumer = validConsumers.length > 0 ? item.price / validConsumers.length : 0;
+
+          const pillsHtml = state.members
+            .map((m) => {
+              const active = validConsumers.includes(m);
+              return `
+                <button
+                  type="button"
+                  data-item-id="${item.id}"
+                  data-item-member="${escapeHtml(m)}"
+                  class="px-2 py-0.5 rounded text-[11px] font-medium border transition ${
+                    active
+                      ? 'bg-zinc-900 text-white border-zinc-900'
+                      : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-300'
+                  }"
+                >
+                  ${escapeHtml(m)}
+                </button>
+              `;
+            })
+            .join('');
+
+          return `
+            <div class="rounded-lg bg-white border border-zinc-200/90 p-2.5 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold text-zinc-900 truncate">${escapeHtml(item.name)}</p>
+                  <p class="text-[11px] text-zinc-400 font-mono-num">
+                    ${state.currency}${Number(item.price).toFixed(2)} total • ${
+                      validConsumers.length > 0
+                        ? `${state.currency}${perConsumer.toFixed(2)} each (${validConsumers.length})`
+                        : 'Select at least 1 person'
+                    }
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-delete-receipt-item="${item.id}"
+                  class="text-xs text-zinc-400 hover:text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50 transition"
+                  title="Remove line item"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="flex flex-wrap items-center gap-1">
+                <span class="text-[10px] uppercase tracking-wider text-zinc-400 mr-1">Shared by:</span>
+                ${pillsHtml}
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function getNetBillTotals() {
+      const rawBill = parseFloat(billInput.value);
+      const baseBill = !isNaN(rawBill) && rawBill >= 0 ? rawBill : 0;
+
+      const rawDiscount = parseFloat(discountInput.value);
+      const discountAmount = !isNaN(rawDiscount) && rawDiscount >= 0 ? Math.min(baseBill, rawDiscount) : 0;
+
+      const netSubtotal = Math.max(0, baseBill - discountAmount);
+      const tipAmount = netSubtotal * (state.tipPercent / 100);
+      const totalBill = netSubtotal + tipAmount;
+
+      return { baseBill, discountAmount, netSubtotal, tipAmount, totalBill };
+    }
+
+    function computeItemizedMemberBreakdown() {
+      const { baseBill, discountAmount, tipAmount, totalBill } = getNetBillTotals();
+      const rawSubtotals = {};
+      state.members.forEach((m) => {
+        rawSubtotals[m] = 0;
+      });
+
+      state.receiptItems.forEach((item) => {
+        const consumers = item.sharedBy.filter((m) => state.members.includes(m));
+        if (consumers.length > 0) {
+          const splitPrice = (Number(item.price) || 0) / consumers.length;
+          consumers.forEach((m) => {
+            rawSubtotals[m] += splitPrice;
+          });
+        }
+      });
+
+      const itemsSum = Object.values(rawSubtotals).reduce((a, b) => a + b, 0);
+      const finalShares = {};
+      const taxAdjustmentByMember = {};
+
+      state.members.forEach((m) => {
+        const weight = itemsSum > 0 ? rawSubtotals[m] / itemsSum : 0;
+        const memberDiscount = discountAmount * weight;
+        const memberTax = tipAmount * weight;
+        taxAdjustmentByMember[m] = memberTax - memberDiscount;
+        const netMember = Math.max(0, rawSubtotals[m] - memberDiscount + memberTax);
+        finalShares[m] = applyRounding(netMember, state.roundMode);
+      });
+
+      return { rawSubtotals, taxAdjustmentByMember, finalShares, totalBill, baseBill };
+    }
+
+    function renderParticipantSplitRows() {
+      const { totalBill } = getNetBillTotals();
+      const activeMembers = state.members.filter((m) => state.includedMembers[m] !== false);
+      const count = Math.max(1, activeMembers.length);
+
+      if (state.splitMode === 'equal') {
+        const rawEach = totalBill / count;
+        const each = applyRounding(rawEach, state.roundMode);
+        participantSplitRows.innerHTML = state.members
+          .map((m) => {
+            const included = state.includedMembers[m] !== false;
+            const amount = included ? each : 0;
+            return `
+              <label class="px-3.5 py-2 flex items-center justify-between gap-3 cursor-pointer hover:bg-zinc-100/70 transition">
+                <span class="flex items-center gap-2.5 text-xs font-medium text-zinc-800">
+                  <input
+                    type="checkbox"
+                    data-toggle-member="${escapeHtml(m)}"
+                    ${included ? 'checked' : ''}
+                    class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                  />
+                  <span>${escapeHtml(m)}</span>
+                </span>
+                <span class="text-xs font-mono-num ${included ? 'font-semibold text-zinc-900' : 'text-zinc-400'}">
+                  ${state.currency}${amount.toFixed(2)}
+                </span>
+              </label>
+            `;
+          })
+          .join('');
+      } else if (state.splitMode === 'items') {
+        const { rawSubtotals, taxAdjustmentByMember, finalShares } = computeItemizedMemberBreakdown();
+        participantSplitRows.innerHTML = state.members
+          .map((m) => {
+            const sub = rawSubtotals[m] || 0;
+            const adj = taxAdjustmentByMember[m] || 0;
+            const finalAmt = finalShares[m] || 0;
+            const adjSign = adj >= 0 ? '+' : '−';
+            return `
+              <div class="px-3.5 py-2 flex items-center justify-between gap-3">
+                <div>
+                  <span class="text-xs font-medium text-zinc-800">${escapeHtml(m)}</span>
+                  <span class="block text-[11px] font-mono-num text-zinc-400">
+                    Items ${state.currency}${sub.toFixed(2)} (${adjSign}${state.currency}${Math.abs(adj).toFixed(2)} tax/disc)
+                  </span>
+                </div>
+                <span class="text-xs font-mono-num font-semibold text-zinc-900">
+                  ${state.currency}${finalAmt.toFixed(2)}
+                </span>
+              </div>
+            `;
+          })
+          .join('');
+      } else if (state.splitMode === 'exact') {
+        participantSplitRows.innerHTML = state.members
+          .map((m) => {
+            const val = state.exactInputs[m] !== undefined ? state.exactInputs[m] : 0;
+            return `
+              <div class="px-3.5 py-2 flex items-center justify-between gap-3">
+                <span class="text-xs font-medium text-zinc-800">${escapeHtml(m)}</span>
+                <div class="relative flex items-center w-28">
+                  <span class="absolute left-2 text-xs font-mono-num text-zinc-400">${state.currency}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    data-exact-member="${escapeHtml(m)}"
+                    value="${val}"
+                    class="w-full rounded border border-zinc-200 bg-white pl-5 pr-2 py-1 text-right text-xs font-mono-num font-semibold text-zinc-900 focus:border-zinc-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+      } else {
+        const totalShares = state.members.reduce((acc, m) => acc + (state.shareWeights[m] || 0), 0) || 1;
+        participantSplitRows.innerHTML = state.members
+          .map((m) => {
+            const weight = state.shareWeights[m] !== undefined ? state.shareWeights[m] : 1;
+            const shareAmt = applyRounding((totalBill * weight) / totalShares, state.roundMode);
+            return `
+              <div class="px-3.5 py-2 flex items-center justify-between gap-3">
+                <span class="text-xs font-medium text-zinc-800">${escapeHtml(m)}</span>
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      step="0.5"
+                      data-share-member="${escapeHtml(m)}"
+                      value="${weight}"
+                      class="w-14 rounded border border-zinc-200 bg-white px-2 py-1 text-center text-xs font-mono-num font-semibold text-zinc-900 focus:border-zinc-900 focus:outline-none"
+                    />
+                    <span class="text-[11px] text-zinc-400 font-mono-num">x</span>
+                  </div>
+                  <span class="w-20 text-right text-xs font-mono-num font-semibold text-zinc-900">
+                    ${state.currency}${shareAmt.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
+      }
+    }
+
+    function calculateLiveSplit() {
+      const { baseBill, discountAmount, tipAmount, totalBill } = getNetBillTotals();
+      const rawPeople = parseInt(peopleInput.value, 10);
+      const people = !isNaN(rawPeople) && rawPeople >= 1 ? Math.min(100, rawPeople) : 1;
+
+      const sharesByMember = {};
+      let perPerson = 0;
+
+      if (state.splitMode === 'equal') {
+        const activeMembers = state.members.filter((m) => state.includedMembers[m] !== false);
+        const divisor = activeMembers.length > 0 ? activeMembers.length : people;
+        const exactEach = totalBill / divisor;
+        perPerson = applyRounding(exactEach, state.roundMode);
+        state.members.forEach((m) => {
+          sharesByMember[m] = state.includedMembers[m] !== false ? perPerson : 0;
+        });
+        perPersonLabel.textContent = 'Each person pays';
+        if (state.roundMode !== 'exact' && Math.abs(perPerson - exactEach) >= 0.01) {
+          roundingNote.textContent = `Unrounded: ${state.currency}${exactEach.toFixed(2)}`;
+          roundingNote.classList.remove('hidden');
+        } else {
+          roundingNote.classList.add('hidden');
+        }
+      } else if (state.splitMode === 'items') {
+        const { finalShares } = computeItemizedMemberBreakdown();
+        let activeConsumers = 0;
+        let sumFinal = 0;
+        state.members.forEach((m) => {
+          sharesByMember[m] = finalShares[m] || 0;
+          sumFinal += sharesByMember[m];
+          if (sharesByMember[m] > 0) activeConsumers++;
+        });
+        perPerson = sumFinal / Math.max(1, activeConsumers || state.members.length);
+        perPersonLabel.textContent = 'Avg per item consumer';
+        roundingNote.textContent = `${state.receiptItems.length} itemized line(s) • proportional tax`;
+        roundingNote.classList.remove('hidden');
+      } else if (state.splitMode === 'exact') {
+        let sumExact = 0;
+        state.members.forEach((m) => {
+          const v = parseFloat(state.exactInputs[m]) || 0;
+          sharesByMember[m] = v;
+          sumExact += v;
+        });
+        perPerson = sumExact / Math.max(1, state.members.length);
+        perPersonLabel.textContent = 'Average per person';
+        const diff = totalBill - sumExact;
+        if (Math.abs(diff) >= 0.01) {
+          roundingNote.textContent =
+            diff > 0
+              ? `${state.currency}${diff.toFixed(2)} unallocated`
+              : `${state.currency}${Math.abs(diff).toFixed(2)} over-allocated`;
+          roundingNote.classList.remove('hidden');
+        } else {
+          roundingNote.textContent = 'Exact amounts match total';
+          roundingNote.classList.remove('hidden');
+        }
+      } else {
+        const totalShares = state.members.reduce((acc, m) => acc + (state.shareWeights[m] || 0), 0) || 1;
+        const unitShare = totalBill / totalShares;
+        perPerson = applyRounding(unitShare, state.roundMode);
+        state.members.forEach((m) => {
+          const w = state.shareWeights[m] || 0;
+          sharesByMember[m] = applyRounding(unitShare * w, state.roundMode);
+        });
+        perPersonLabel.textContent = 'Per 1x share';
+        roundingNote.textContent = `${totalShares} total shares`;
+        roundingNote.classList.remove('hidden');
+      }
+
+      liveReceiptTitle.textContent = titleInput.value.trim() || 'Current Bill';
+      baseBillDisplay.textContent = baseBill.toFixed(2);
+      if (discountAmount > 0) {
+        discountRow.classList.remove('hidden');
+        discountRow.classList.add('flex');
+        discountDisplay.textContent = discountAmount.toFixed(2);
+      } else {
+        discountRow.classList.add('hidden');
+        discountRow.classList.remove('flex');
+      }
+      tipPercentDisplay.textContent = String(state.tipPercent);
+      tipAmountDisplay.textContent = tipAmount.toFixed(2);
+      totalBillDisplay.textContent = totalBill.toFixed(2);
+      perPersonDisplay.textContent = perPerson.toFixed(2);
+      livePeopleBadge.textContent = people === 1 ? '1 person' : `${people} people`;
+
+      return { baseBill, discountAmount, people, tipAmount, totalBill, perPerson, sharesByMember };
+    }
+
+    // --- CATEGORY ANALYTICS ENGINE ---
+    function renderCategoryAnalytics() {
+      const catTotals = {};
+      const payerTotals = {};
+      let totalSpend = 0;
+
+      state.expenses.forEach((exp) => {
+        if (exp.title && exp.title.startsWith('Settlement:')) return;
+        const cat = exp.category || 'Other';
+        const amt = Number(exp.totalAmount) || 0;
+        catTotals[cat] = (catTotals[cat] || 0) + amt;
+        totalSpend += amt;
+
+        const payer = exp.paidBy || state.members[0] || 'You';
+        payerTotals[payer] = (payerTotals[payer] || 0) + amt;
+      });
+
+      const topPayerEntry = Object.entries(payerTotals).sort((a, b) => b[1] - a[1])[0];
+      if (topPayerEntry && topPayerEntry[1] > 0) {
+        topPayerBadge.textContent = `Top Payer: ${topPayerEntry[0]} (${state.currency}${topPayerEntry[1].toFixed(0)})`;
+      } else {
+        topPayerBadge.textContent = 'No spend logged';
+      }
+
+      if (totalSpend <= 0) {
+        categoryStackedBar.innerHTML = `<div class="h-full w-full bg-zinc-200"></div>`;
+        categoryBreakdownList.innerHTML = `
+          <p class="text-xs text-zinc-400 text-center py-2">Save an expense to see category analytics.</p>
+        `;
+        return;
+      }
+
+      const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+
+      categoryStackedBar.innerHTML = sortedCats
+        .map(([cat, amt]) => {
+          const pct = Math.max(2, (amt / totalSpend) * 100);
+          const colorObj = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other;
+          return `<div class="${colorObj.bar} h-full transition-all" style="width: ${pct.toFixed(1)}%" title="${escapeHtml(cat)}: ${state.currency}${amt.toFixed(2)}"></div>`;
+        })
+        .join('');
+
+      categoryBreakdownList.innerHTML = sortedCats
+        .map(([cat, amt]) => {
+          const pct = (amt / totalSpend) * 100;
+          const colorObj = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other;
+          return `
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-xs ${colorObj.dot}"></span>
+                <span class="font-medium text-zinc-800">${escapeHtml(cat)}</span>
+              </div>
+              <div class="flex items-center gap-3 font-mono-num">
+                <span class="text-zinc-400 text-[11px]">${pct.toFixed(1)}%</span>
+                <span class="font-semibold text-zinc-900 w-20 text-right">${state.currency}${amt.toFixed(2)}</span>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    // --- STEP 3: PARTICIPANT SPEND MATRIX & SETTLEMENT ENGINE ---
+    function computeMemberAccounting() {
+      const paidByMember = {};
+      const consumedByMember = {};
+      const net = {};
+
+      state.members.forEach((m) => {
+        paidByMember[m] = 0;
+        consumedByMember[m] = 0;
+        net[m] = 0;
+      });
+
+      state.expenses.forEach((exp) => {
+        const isSettlement = exp.title && exp.title.startsWith('Settlement:');
+        const payer = exp.paidBy || state.members[0] || 'You';
+        if (net[payer] === undefined) {
+          paidByMember[payer] = 0;
+          consumedByMember[payer] = 0;
+          net[payer] = 0;
+        }
+        net[payer] += exp.totalAmount;
+        if (!isSettlement) {
+          paidByMember[payer] += exp.totalAmount;
+        }
+
+        if (exp.sharesByMember && Object.keys(exp.sharesByMember).length > 0) {
+          Object.entries(exp.sharesByMember).forEach(([member, owed]) => {
+            if (net[member] === undefined) {
+              paidByMember[member] = 0;
+              consumedByMember[member] = 0;
+              net[member] = 0;
+            }
+            const val = Number(owed) || 0;
+            net[member] -= val;
+            if (!isSettlement) {
+              consumedByMember[member] += val;
+            }
+          });
+        } else {
+          const share = exp.totalAmount / Math.max(1, state.members.length);
+          state.members.forEach((m) => {
+            net[m] -= share;
+            if (!isSettlement) {
+              consumedByMember[m] += share;
+            }
+          });
+        }
+      });
+
+      return { paidByMember, consumedByMember, net };
+    }
+
+    function renderParticipantMatrix() {
+      const { paidByMember, consumedByMember, net } = computeMemberAccounting();
+      const members = Object.keys(net);
+      const totalConsumed = Object.values(consumedByMember).reduce((a, b) => a + b, 0);
+      const avgConsumed = totalConsumed / Math.max(1, members.length);
+      matrixAvgBadge.textContent = `Avg Consumed: ${state.currency}${avgConsumed.toFixed(2)}`;
+
+      const maxVal = Math.max(
+        1,
+        ...members.map((m) => Math.max(paidByMember[m] || 0, consumedByMember[m] || 0))
+      );
+
+      participantMatrixBody.innerHTML = members
+        .map((m) => {
+          const paid = paidByMember[m] || 0;
+          const consumed = consumedByMember[m] || 0;
+          const bal = net[m] || 0;
+          const paidPct = Math.min(100, (paid / maxVal) * 100);
+          const consumedPct = Math.min(100, (consumed / maxVal) * 100);
+
+          const netBadge =
+            bal > 0.01
+              ? `<span class="text-emerald-700 font-semibold">+${state.currency}${bal.toFixed(2)}</span>`
+              : bal < -0.01
+              ? `<span class="text-rose-700 font-semibold">−${state.currency}${Math.abs(bal).toFixed(2)}</span>`
+              : `<span class="text-zinc-400">0.00</span>`;
+
+          return `
+            <tr class="hover:bg-zinc-50/80 transition">
+              <td class="py-3 px-5 font-medium text-zinc-900">${escapeHtml(m)}</td>
+              <td class="py-3 px-4 text-right font-mono-num text-zinc-700">${state.currency}${paid.toFixed(2)}</td>
+              <td class="py-3 px-4 text-right font-mono-num text-zinc-700">${state.currency}${consumed.toFixed(2)}</td>
+              <td class="py-3 px-4 text-right font-mono-num">${netBadge}</td>
+              <td class="py-3 px-5 hidden sm:table-cell">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-zinc-400 w-8">Paid</span>
+                    <div class="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                      <div class="h-full bg-zinc-900 rounded-full" style="width: ${paidPct.toFixed(1)}%"></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-zinc-400 w-8">Used</span>
+                    <div class="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                      <div class="h-full bg-emerald-600 rounded-full" style="width: ${consumedPct.toFixed(1)}%"></div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+
+    function computeSettlements() {
+      const { net } = computeMemberAccounting();
+
+      memberBalancesList.innerHTML = Object.entries(net)
+        .map(([member, bal]) => {
+          const isPositive = bal > 0.01;
+          const isNegative = bal < -0.01;
+          const badgeClass = isPositive
+            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+            : isNegative
+            ? 'text-rose-700 bg-rose-50 border-rose-200'
+            : 'text-zinc-500 bg-zinc-50 border-zinc-200';
+          const prefix = isPositive ? 'gets +' : isNegative ? 'owes −' : 'settled ';
+          return `
+            <div class="rounded-lg border px-3 py-2 flex items-center justify-between ${badgeClass}">
+              <span class="text-xs font-medium truncate">${escapeHtml(member)}</span>
+              <span class="text-xs font-mono-num font-semibold">${prefix}${state.currency}${Math.abs(bal).toFixed(2)}</span>
+            </div>
+          `;
+        })
+        .join('');
+
+      const debtors = [];
+      const creditors = [];
+      Object.entries(net).forEach(([member, bal]) => {
+        if (bal < -0.01) debtors.push({ member, amount: -bal });
+        else if (bal > 0.01) creditors.push({ member, amount: bal });
+      });
+
+      debtors.sort((a, b) => b.amount - a.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
+
+      const transfers = [];
+      let i = 0;
+      let j = 0;
+      while (i < debtors.length && j < creditors.length) {
+        const payAmt = Math.min(debtors[i].amount, creditors[j].amount);
+        if (payAmt > 0.01) {
+          transfers.push({
+            from: debtors[i].member,
+            to: creditors[j].member,
+            amount: payAmt
+          });
+        }
+        debtors[i].amount -= payAmt;
+        creditors[j].amount -= payAmt;
+        if (debtors[i].amount <= 0.01) i++;
+        if (creditors[j].amount <= 0.01) j++;
+      }
+
+      if (transfers.length === 0) {
+        settlementTransfersList.innerHTML = `
+          <div class="rounded-lg bg-zinc-50 border border-zinc-200/70 px-3 py-2.5 text-xs text-zinc-500 text-center">
+            All participants are settled up.
+          </div>
+        `;
+      } else {
+        settlementTransfersList.innerHTML = transfers
+          .map(
+            (t) => `
+            <div class="rounded-lg bg-zinc-50 border border-zinc-200/80 px-3 py-2 flex items-center justify-between gap-2">
+              <div class="text-xs text-zinc-800">
+                <span class="font-semibold">${escapeHtml(t.from)}</span>
+                <span class="text-zinc-400 mx-1">→</span>
+                <span class="font-semibold">${escapeHtml(t.to)}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono-num font-bold text-zinc-900">${state.currency}${t.amount.toFixed(2)}</span>
+                <button
+                  type="button"
+                  data-settle-from="${escapeHtml(t.from)}"
+                  data-settle-to="${escapeHtml(t.to)}"
+                  data-settle-amt="${t.amount.toFixed(2)}"
+                  class="text-[11px] font-medium bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded px-2 py-0.5 transition no-print"
+                >
+                  Record Paid
+                </button>
+              </div>
+            </div>
+          `
+          )
+          .join('');
+      }
+
+      return transfers;
+    }
+
+    function renderExpenseLog() {
+      let grandTotal = 0;
+      state.expenses.forEach((item) => {
+        if (!item.title || !item.title.startsWith('Settlement:')) {
+          grandTotal += item.totalAmount;
+        }
+      });
+      grandTotalDisplay.textContent = grandTotal.toFixed(2);
+      ledgerCountBadge.textContent =
+        state.expenses.length === 1 ? '1 entry' : `${state.expenses.length} entries`;
+
+      const filtered = state.expenses.filter((item) => {
+        const matchesCat =
+          state.activeCategoryFilter === 'ALL' || item.category === state.activeCategoryFilter;
+        const q = state.searchQuery.toLowerCase();
+        const matchesQuery =
+          !q ||
+          item.title.toLowerCase().includes(q) ||
+          (item.paidBy && item.paidBy.toLowerCase().includes(q)) ||
+          (item.category && item.category.toLowerCase().includes(q));
+        return matchesCat && matchesQuery;
+      });
+
+      if (filtered.length === 0) {
+        expenseListEl.innerHTML = `
+          <div class="py-10 px-4 text-center text-xs text-zinc-400">
+            No matching expenses found. Enter a bill above and click <strong>+ Save to Expense Log</strong>.
+          </div>
+        `;
+        computeSettlements();
+        renderCategoryAnalytics();
+        renderParticipantMatrix();
+        return;
+      }
+
+      expenseListEl.innerHTML = filtered
+        .map((item) => {
+          const payer = item.paidBy || state.members[0] || 'You';
+          const tipNote = item.tipPercent > 0 ? ` • +${item.tipPercent}% tax` : '';
+          const modeBadge =
+            item.splitMode === 'items'
+              ? `<span class="text-[10px] font-mono-num bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded ml-1.5">Itemized</span>`
+              : '';
+          return `
+            <div class="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-50/80 transition">
+              <div class="flex items-start gap-3 min-w-0">
+                <span class="mt-0.5 shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-100 text-zinc-700 border border-zinc-200/70">
+                  ${escapeHtml(item.category || 'Dining')}
+                </span>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-zinc-900 truncate">
+                    ${escapeHtml(item.title)}${modeBadge}
+                  </p>
+                  <p class="text-xs text-zinc-500 font-mono-num mt-0.5">
+                    Paid by <strong class="font-sans text-zinc-700">${escapeHtml(payer)}</strong> • Total ${state.currency}${item.totalAmount.toFixed(2)}${tipNote} • ${item.people} ${item.people === 1 ? 'person' : 'people'}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                <div class="text-left sm:text-right font-mono-num">
+                  <span class="text-[10px] uppercase tracking-wider text-zinc-400 block">Per share</span>
+                  <span class="text-sm font-semibold text-zinc-900">${state.currency}${item.perPerson.toFixed(2)}</span>
+                </div>
+                <div class="flex items-center gap-1 no-print">
+                  <button
+                    type="button"
+                    data-edit-id="${item.id}"
+                    class="text-xs text-zinc-500 hover:text-zinc-900 px-2 py-1 rounded hover:bg-zinc-200/60 transition"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    data-remove-id="${item.id}"
+                    aria-label="Remove expense"
+                    class="text-xs text-zinc-400 hover:text-rose-600 px-2 py-1 rounded hover:bg-rose-50 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+
+      computeSettlements();
+      renderCategoryAnalytics();
+      renderParticipantMatrix();
+    }
+
+    // --- STEP 3: BUILD STATEMENT MODAL & TEXT REPORT ---
+    function buildFullStatementText() {
+      const ws = state.workspaces[state.activeWorkspaceId];
+      const wsName = ws ? ws.name : 'Group Ledger';
+      const { paidByMember, consumedByMember, net } = computeMemberAccounting();
+      const transfers = computeSettlements();
+      let grandTotal = 0;
+      state.expenses.forEach((e) => {
+        if (!e.title || !e.title.startsWith('Settlement:')) grandTotal += e.totalAmount;
+      });
+
+      const lines = [
+        `LEDGER STATEMENT — ${wsName.toUpperCase()}`,
+        `Total Group Spend: ${state.currency}${grandTotal.toFixed(2)} (${state.members.length} participants)`,
+        ``,
+        `PARTICIPANT SUMMARY:`
+      ];
+
+      Object.keys(net).forEach((m) => {
+        const bal = net[m] || 0;
+        const status =
+          bal > 0.01
+            ? `gets back +${state.currency}${bal.toFixed(2)}`
+            : bal < -0.01
+            ? `owes -${state.currency}${Math.abs(bal).toFixed(2)}`
+            : `settled (0.00)`;
+        lines.push(
+          `• ${m}: Paid ${state.currency}${(paidByMember[m] || 0).toFixed(2)} | Consumed ${state.currency}${(consumedByMember[m] || 0).toFixed(2)} -> ${status}`
+        );
+      });
+
+      lines.push(``, `RECOMMENDED TRANSFERS:`);
+      if (transfers.length === 0) {
+        lines.push(`• Everyone is settled up.`);
+      } else {
+        transfers.forEach((t) => {
+          lines.push(`• ${t.from} -> ${t.to}: ${state.currency}${t.amount.toFixed(2)}`);
+        });
+      }
+
+      return lines.join('\n');
+    }
+
+    function openStatementModal() {
+      const ws = state.workspaces[state.activeWorkspaceId];
+      statementModalTitle.textContent = ws ? ws.name : 'Group Statement';
+      const { paidByMember, consumedByMember, net } = computeMemberAccounting();
+      const transfers = computeSettlements();
+
+      let grandTotal = 0;
+      state.expenses.forEach((e) => {
+        if (!e.title || !e.title.startsWith('Settlement:')) grandTotal += e.totalAmount;
+      });
+
+      const memberRowsHtml = Object.keys(net)
+        .map((m) => {
+          const bal = net[m] || 0;
+          const balText =
+            bal > 0.01
+              ? `<span class="text-emerald-700 font-semibold">+${state.currency}${bal.toFixed(2)}</span>`
+              : bal < -0.01
+              ? `<span class="text-rose-700 font-semibold">−${state.currency}${Math.abs(bal).toFixed(2)}</span>`
+              : `<span class="text-zinc-400">0.00</span>`;
+          return `
+            <tr class="border-b border-zinc-100">
+              <td class="py-2 font-medium text-zinc-900">${escapeHtml(m)}</td>
+              <td class="py-2 text-right font-mono-num">${state.currency}${(paidByMember[m] || 0).toFixed(2)}</td>
+              <td class="py-2 text-right font-mono-num">${state.currency}${(consumedByMember[m] || 0).toFixed(2)}</td>
+              <td class="py-2 text-right font-mono-num">${balText}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      const transfersHtml =
+        transfers.length === 0
+          ? `<p class="text-zinc-500 py-2">All participants are settled up.</p>`
+          : transfers
+              .map(
+                (t) => `
+              <div class="flex items-center justify-between py-1.5 border-b border-zinc-100 font-mono-num">
+                <span class="font-sans text-zinc-800"><strong>${escapeHtml(t.from)}</strong> pays <strong>${escapeHtml(t.to)}</strong></span>
+                <span class="font-bold text-zinc-900">${state.currency}${t.amount.toFixed(2)}</span>
+              </div>
+            `
+              )
+              .join('');
+
+      statementModalBody.innerHTML = `
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-zinc-50 p-3.5 rounded-lg border border-zinc-200/80">
+          <div>
+            <span class="text-[10px] uppercase tracking-wider text-zinc-400 block">Total Spend</span>
+            <span class="text-sm font-mono-num font-bold text-zinc-900">${state.currency}${grandTotal.toFixed(2)}</span>
+          </div>
+          <div>
+            <span class="text-[10px] uppercase tracking-wider text-zinc-400 block">Participants</span>
+            <span class="text-sm font-mono-num font-semibold text-zinc-900">${state.members.length}</span>
+          </div>
+          <div>
+            <span class="text-[10px] uppercase tracking-wider text-zinc-400 block">Logged Bills</span>
+            <span class="text-sm font-mono-num font-semibold text-zinc-900">${state.expenses.length}</span>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">1. Participant Accounting</h3>
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-zinc-200 text-[10px] uppercase text-zinc-400">
+                <th class="py-1.5">Name</th>
+                <th class="py-1.5 text-right">Paid Up Front</th>
+                <th class="py-1.5 text-right">Consumed</th>
+                <th class="py-1.5 text-right">Net Balance</th>
+              </tr>
+            </thead>
+            <tbody>${memberRowsHtml}</tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">2. Required Settlement Transfers</h3>
+          <div>${transfersHtml}</div>
+        </div>
+      `;
+
+      statementModal.classList.remove('hidden');
+      statementModal.classList.add('flex');
+    }
+
+    function updateTipButtonStyles(customActive) {
+      tipLabel.textContent = `${state.tipPercent}%`;
+      tipButtons.forEach((btn) => {
+        const val = parseFloat(btn.getAttribute('data-tip'));
+        const active = !customActive && val === state.tipPercent;
+        btn.className = active
+          ? 'tip-btn py-1.5 rounded-lg text-xs font-mono-num font-medium border border-zinc-900 bg-zinc-900 text-white transition'
+          : 'tip-btn py-1.5 rounded-lg text-xs font-mono-num font-medium border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 transition';
+      });
+    }
+
+    function updateSplitModeStyles() {
+      splitModeButtons.forEach((btn) => {
+        const active = btn.getAttribute('data-mode') === state.splitMode;
+        btn.className = active
+          ? 'split-mode-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white text-zinc-900 shadow-2xs transition'
+          : 'split-mode-btn px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:text-zinc-900 transition';
+      });
+    }
+
+    function updateRoundButtonStyles() {
+      roundButtons.forEach((btn) => {
+        const active = btn.getAttribute('data-round') === state.roundMode;
+        btn.className = active
+          ? 'round-btn px-2.5 py-1 rounded-md text-xs font-medium bg-white text-zinc-900 shadow-2xs transition'
+          : 'round-btn px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:text-zinc-900 transition';
+      });
+    }
+
+    function updateCurrencySymbols() {
+      currencySelect.value = state.currency;
+      document.querySelectorAll('.currency-symbol').forEach((el) => {
+        el.textContent = state.currency;
+      });
+      renderWorkspacesBar();
+      renderReceiptItemsEditor();
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+      renderExpenseLog();
+    }
+
+    function showFeedback(message) {
+      if (!message) {
+        formFeedback.classList.add('hidden');
+        formFeedback.textContent = '';
+        return;
+      }
+      formFeedback.textContent = message;
+      formFeedback.classList.remove('hidden');
+    }
+
+    function copyText(text, toastMsg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          () => showToast(toastMsg),
+          () => fallbackCopy(text, toastMsg)
+        );
+      } else {
+        fallbackCopy(text, toastMsg);
+      }
+    }
+
+    function fallbackCopy(text, toastMsg) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(toastMsg);
+      } catch (e) {
+        showToast('Ready to copy');
+      }
+      document.body.removeChild(ta);
+    }
+
+    // --- WORKSPACE SWITCHER HANDLERS ---
+    workspaceTabsContainer.addEventListener('click', (e) => {
+      const switchBtn = e.target.closest('[data-switch-ws]');
+      if (switchBtn) {
+        const targetId = switchBtn.getAttribute('data-switch-ws');
+        if (targetId && state.workspaces[targetId]) {
+          persistState();
+          state.activeWorkspaceId = targetId;
+          loadActiveWorkspaceIntoState();
+          peopleInput.value = String(state.members.length);
+          renderWorkspacesBar();
+          renderMembersBar();
+          updateCurrencySymbols();
+          showToast(`Switched to ${state.workspaces[targetId].name}`);
+        }
+        return;
+      }
+
+      const delBtn = e.target.closest('[data-delete-ws]');
+      if (delBtn) {
+        const targetId = delBtn.getAttribute('data-delete-ws');
+        const keys = Object.keys(state.workspaces);
+        if (keys.length <= 1 || !state.workspaces[targetId]) return;
+        const removedName = state.workspaces[targetId].name;
+        delete state.workspaces[targetId];
+        if (state.activeWorkspaceId === targetId) {
+          state.activeWorkspaceId = Object.keys(state.workspaces)[0];
+          loadActiveWorkspaceIntoState();
+        }
+        persistState();
+        renderWorkspacesBar();
+        renderMembersBar();
+        updateCurrencySymbols();
+        showToast(`Deleted ${removedName}`);
+      }
+    });
+
+    newWorkspaceForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = newWorkspaceInput.value.trim();
+      if (!name) return;
+      persistState();
+      const id = 'ws_' + Date.now();
+      state.workspaces[id] = {
+        id,
+        name,
+        currency: state.currency,
+        members: ['Aarav', 'Priya', 'Rohan'],
+        expenses: []
+      };
+      state.activeWorkspaceId = id;
+      newWorkspaceInput.value = '';
+      loadActiveWorkspaceIntoState();
+      peopleInput.value = String(state.members.length);
+      persistState();
+      renderWorkspacesBar();
+      renderMembersBar();
+      updateCurrencySymbols();
+      showToast(`Created workspace: ${name}`);
+    });
+
+    // --- STATEMENT MODAL HANDLERS ---
+    openStatementBtn.addEventListener('click', openStatementModal);
+    closeStatementBtn.addEventListener('click', () => {
+      statementModal.classList.add('hidden');
+      statementModal.classList.remove('flex');
+    });
+    statementModal.addEventListener('click', (e) => {
+      if (e.target === statementModal) {
+        statementModal.classList.add('hidden');
+        statementModal.classList.remove('flex');
+      }
+    });
+    copyFullStatementBtn.addEventListener('click', () => {
+      copyText(buildFullStatementText(), 'Full statement copied');
+    });
+    printStatementBtn.addEventListener('click', () => {
+      window.print();
+    });
+
+    // --- PARTICIPANT & BILL EVENT LISTENERS ---
+    addMemberForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const raw = newMemberInput.value.trim();
+      if (!raw) return;
+      if (state.members.some((m) => m.toLowerCase() === raw.toLowerCase())) {
+        showToast('Participant already exists');
+        return;
+      }
+      state.members.push(raw);
+      state.includedMembers[raw] = true;
+      state.exactInputs[raw] = 0;
+      state.shareWeights[raw] = 1;
+      peopleInput.value = String(state.members.length);
+      newMemberInput.value = '';
+      persistState();
+      renderMembersBar();
+      renderReceiptItemsEditor();
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+      renderExpenseLog();
+      showToast(`Added ${raw}`);
+    });
+
+    memberChipsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-remove-member]');
+      if (!btn || state.members.length <= 1) return;
+      const name = btn.getAttribute('data-remove-member');
+      state.members = state.members.filter((m) => m !== name);
+      delete state.includedMembers[name];
+      delete state.exactInputs[name];
+      delete state.shareWeights[name];
+      peopleInput.value = String(state.members.length);
+      persistState();
+      renderMembersBar();
+      renderReceiptItemsEditor();
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+      renderExpenseLog();
+    });
+
+    addReceiptItemBtn.addEventListener('click', () => {
+      const name = newItemNameInput.value.trim();
+      const price = parseFloat(newItemPriceInput.value);
+      if (!name || isNaN(price) || price <= 0) {
+        showToast('Enter an item name and valid price');
+        return;
+      }
+      state.receiptItems.push({
+        id: Date.now(),
+        name,
+        price,
+        sharedBy: state.members.slice()
+      });
+      newItemNameInput.value = '';
+      newItemPriceInput.value = '';
+      syncSubtotalFromReceiptItems();
+      renderReceiptItemsEditor();
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+      showToast(`Added ${name}`);
+    });
+
+    loadSampleReceiptBtn.addEventListener('click', () => {
+      const m = state.members;
+      state.receiptItems = [
+        { id: Date.now() + 1, name: 'Awadhi Mutton Biryani', price: 780, sharedBy: m.slice(0, 2) },
+        { id: Date.now() + 2, name: 'Paneer Tikka & Garlic Naan', price: 620, sharedBy: m.slice(Math.min(2, m.length - 1)) },
+        { id: Date.now() + 3, name: 'Masala Papad & Beverages', price: 280, sharedBy: m.slice() },
+        { id: Date.now() + 4, name: 'Shahi Tukda Dessert', price: 320, sharedBy: m.slice() }
+      ];
+      syncSubtotalFromReceiptItems();
+      renderReceiptItemsEditor();
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+      showToast('Loaded 4-item restaurant receipt');
+    });
+
+    receiptItemsList.addEventListener('click', (e) => {
+      const delBtn = e.target.closest('[data-delete-receipt-item]');
+      if (delBtn) {
+        const id = Number(delBtn.getAttribute('data-delete-receipt-item'));
+        state.receiptItems = state.receiptItems.filter((it) => it.id !== id);
+        syncSubtotalFromReceiptItems();
+        renderReceiptItemsEditor();
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+        return;
+      }
+
+      const memberPill = e.target.closest('[data-item-member]');
+      if (memberPill) {
+        const id = Number(memberPill.getAttribute('data-item-id'));
+        const member = memberPill.getAttribute('data-item-member');
+        const item = state.receiptItems.find((it) => it.id === id);
+        if (!item) return;
+
+        if (item.sharedBy.includes(member)) {
+          if (item.sharedBy.length <= 1) {
+            showToast('At least 1 person must share an item');
+            return;
+          }
+          item.sharedBy = item.sharedBy.filter((m) => m !== member);
+        } else {
+          item.sharedBy.push(member);
+        }
+        renderReceiptItemsEditor();
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+      }
+    });
+
+    [titleInput, billInput, discountInput].forEach((inp) => {
+      inp.addEventListener('input', () => {
+        showFeedback('');
+        if (state.splitMode === 'exact' && inp !== titleInput) {
+          const { totalBill } = getNetBillTotals();
+          const eq = +(totalBill / Math.max(1, state.members.length)).toFixed(2);
+          state.members.forEach((m) => {
+            state.exactInputs[m] = eq;
+          });
+        }
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+      });
+    });
+
+    peopleInput.addEventListener('input', () => {
+      showFeedback('');
+      calculateLiveSplit();
+    });
+
+    decreasePeopleBtn.addEventListener('click', () => {
+      const current = parseInt(peopleInput.value, 10) || 1;
+      peopleInput.value = String(Math.max(1, current - 1));
+      calculateLiveSplit();
+    });
+
+    increasePeopleBtn.addEventListener('click', () => {
+      const current = parseInt(peopleInput.value, 10) || 1;
+      peopleInput.value = String(Math.min(100, current + 1));
+      calculateLiveSplit();
+    });
+
+    tipButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.tipPercent = parseFloat(btn.getAttribute('data-tip')) || 0;
+        customTipInput.value = '';
+        updateTipButtonStyles(false);
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+      });
+    });
+
+    customTipInput.addEventListener('input', () => {
+      const val = parseFloat(customTipInput.value);
+      if (!isNaN(val) && val >= 0) {
+        state.tipPercent = Math.min(100, val);
+        updateTipButtonStyles(true);
+      } else {
+        state.tipPercent = 0;
+        updateTipButtonStyles(false);
+      }
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+    });
+
+    splitModeButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.splitMode = btn.getAttribute('data-mode') || 'equal';
+        if (state.splitMode === 'exact') {
+          const { totalBill } = getNetBillTotals();
+          const each = +(totalBill / Math.max(1, state.members.length)).toFixed(2);
+          state.members.forEach((m) => {
+            state.exactInputs[m] = each;
+          });
+        }
+        syncSubtotalFromReceiptItems();
+        updateSplitModeStyles();
+        renderReceiptItemsEditor();
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+      });
+    });
+
+    participantSplitRows.addEventListener('change', (e) => {
+      const toggle = e.target.closest('[data-toggle-member]');
+      if (toggle) {
+        const member = toggle.getAttribute('data-toggle-member');
+        state.includedMembers[member] = toggle.checked;
+        const activeCount = state.members.filter((m) => state.includedMembers[m] !== false).length;
+        if (activeCount === 0) {
+          state.includedMembers[member] = true;
+          toggle.checked = true;
+          showToast('At least 1 person must be included');
+          return;
+        }
+        peopleInput.value = String(activeCount);
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+      }
+    });
+
+    participantSplitRows.addEventListener('input', (e) => {
+      const exactInp = e.target.closest('[data-exact-member]');
+      if (exactInp) {
+        const m = exactInp.getAttribute('data-exact-member');
+        state.exactInputs[m] = parseFloat(exactInp.value) || 0;
+        calculateLiveSplit();
+        return;
+      }
+      const shareInp = e.target.closest('[data-share-member]');
+      if (shareInp) {
+        const m = shareInp.getAttribute('data-share-member');
+        state.shareWeights[m] = Math.max(0, parseFloat(shareInp.value) || 0);
+        calculateLiveSplit();
+      }
+    });
+
+    roundButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.roundMode = btn.getAttribute('data-round') || 'exact';
+        updateRoundButtonStyles();
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+      });
+    });
+
+    currencySelect.addEventListener('change', () => {
+      state.currency = currencySelect.value;
+      persistState();
+      updateCurrencySymbols();
+    });
+
+    sampleBtn.addEventListener('click', () => {
+      state.editingId = null;
+      editModeBadge.classList.add('hidden');
+      titleInput.value = 'Team Dinner & Kebabs';
+      categorySelect.value = 'Dining';
+      discountInput.value = '200';
+      peopleInput.value = String(state.members.length);
+      state.tipPercent = 10;
+      customTipInput.value = '';
+      state.splitMode = 'items';
+      state.roundMode = 'nearest1';
+      syncSubtotalFromReceiptItems();
+      updateTipButtonStyles(false);
+      updateSplitModeStyles();
+      updateRoundButtonStyles();
+      renderReceiptItemsEditor();
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+      showToast('Loaded itemized sample dinner');
+    });
+
+    resetFormBtn.addEventListener('click', () => {
+      state.editingId = null;
+      editModeBadge.classList.add('hidden');
+      titleInput.value = '';
+      billInput.value = '0';
+      discountInput.value = '0';
+      peopleInput.value = String(state.members.length);
+      state.tipPercent = 0;
+      customTipInput.value = '';
+      state.splitMode = 'equal';
+      state.roundMode = 'exact';
+      syncSubtotalFromReceiptItems();
+      updateTipButtonStyles(false);
+      updateSplitModeStyles();
+      updateRoundButtonStyles();
+      showFeedback('');
+      renderReceiptItemsEditor();
+      renderParticipantSplitRows();
+      calculateLiveSplit();
+    });
+
+    expenseForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const { baseBill, discountAmount, people, totalBill, perPerson, sharesByMember } = calculateLiveSplit();
+      if (baseBill <= 0) {
+        showFeedback('Enter a subtotal greater than 0 before saving.');
+        return;
+      }
+
+      const title = titleInput.value.trim() || `${categorySelect.value} Bill`;
+      const paidBy = paidBySelect.value || state.members[0] || 'You';
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      if (state.editingId !== null) {
+        state.expenses = state.expenses.map((item) =>
+          item.id === state.editingId
+            ? {
+                ...item,
+                title,
+                category: categorySelect.value,
+                paidBy,
+                baseAmount: baseBill,
+                discountAmount,
+                tipPercent: state.tipPercent,
+                totalAmount: totalBill,
+                people,
+                splitMode: state.splitMode,
+                roundMode: state.roundMode,
+                perPerson,
+                sharesByMember
+              }
+            : item
+        );
+        state.editingId = null;
+        editModeBadge.classList.add('hidden');
+        showToast('Updated expense');
+      } else {
+        state.expenses.unshift({
+          id: Date.now(),
+          title,
+          category: categorySelect.value,
+          paidBy,
+          baseAmount: baseBill,
+          discountAmount,
+          tipPercent: state.tipPercent,
+          totalAmount: totalBill,
+          people,
+          splitMode: state.splitMode,
+          roundMode: state.roundMode,
+          perPerson,
+          sharesByMember,
+          timestamp: `Today, ${timeStr}`
+        });
+        showToast('Saved to ledger');
+      }
+
+      titleInput.value = '';
+      showFeedback('');
+      persistState();
+      renderExpenseLog();
+    });
+
+    expenseListEl.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-remove-id]');
+      if (removeBtn) {
+        const id = Number(removeBtn.getAttribute('data-remove-id'));
+        state.expenses = state.expenses.filter((item) => item.id !== id);
+        persistState();
+        renderExpenseLog();
+        showToast('Removed entry');
+        return;
+      }
+
+      const editBtn = e.target.closest('[data-edit-id]');
+      if (editBtn) {
+        const id = Number(editBtn.getAttribute('data-edit-id'));
+        const item = state.expenses.find((x) => x.id === id);
+        if (!item) return;
+        state.editingId = item.id;
+        editModeBadge.classList.remove('hidden');
+        titleInput.value = item.title;
+        categorySelect.value = item.category || 'Dining';
+        if (item.paidBy && state.members.includes(item.paidBy)) {
+          paidBySelect.value = item.paidBy;
+        }
+        billInput.value = String(item.baseAmount);
+        discountInput.value = String(item.discountAmount || 0);
+        peopleInput.value = String(item.people);
+        state.tipPercent = item.tipPercent || 0;
+        state.splitMode = item.splitMode || 'equal';
+        state.roundMode = item.roundMode || 'exact';
+        updateTipButtonStyles(![0, 5, 10, 15, 18].includes(state.tipPercent));
+        updateSplitModeStyles();
+        updateRoundButtonStyles();
+        renderReceiptItemsEditor();
+        renderParticipantSplitRows();
+        calculateLiveSplit();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+
+    settlementTransfersList.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-settle-from]');
+      if (!btn) return;
+      const from = btn.getAttribute('data-settle-from');
+      const to = btn.getAttribute('data-settle-to');
+      const amt = parseFloat(btn.getAttribute('data-settle-amt')) || 0;
+      if (amt <= 0) return;
+
+      const sharesByMember = {};
+      state.members.forEach((m) => {
+        sharesByMember[m] = m === to ? amt : 0;
+      });
+
+      state.expenses.unshift({
+        id: Date.now(),
+        title: `Settlement: ${from} → ${to}`,
+        category: 'Other',
+        paidBy: from,
+        baseAmount: amt,
+        discountAmount: 0,
+        tipPercent: 0,
+        totalAmount: amt,
+        people: 1,
+        splitMode: 'exact',
+        roundMode: 'exact',
+        perPerson: amt,
+        sharesByMember,
+        timestamp: 'Settled just now'
+      });
+      persistState();
+      renderExpenseLog();
+      showToast(`Recorded ${state.currency}${amt.toFixed(2)} settlement`);
+    });
+
+    copySummaryBtn.addEventListener('click', () => {
+      const { totalBill, people, perPerson, sharesByMember } = calculateLiveSplit();
+      const title = titleInput.value.trim() || 'Bill Split';
+      const paidBy = paidBySelect.value || state.members[0];
+      const memberBreakdown = Object.entries(sharesByMember)
+        .filter(([, amt]) => amt > 0)
+        .map(([m, amt]) => `${m}: ${state.currency}${amt.toFixed(2)}`)
+        .join(', ');
+      const text = `${title} (Paid by ${paidBy}) — Total: ${state.currency}${totalBill.toFixed(2)} | Breakdown: ${memberBreakdown || `${state.currency}${perPerson.toFixed(2)} each (${people} people)`}`;
+      copyText(text, 'Split summary copied');
+    });
+
+    copySettlementBtn.addEventListener('click', () => {
+      const transfers = computeSettlements();
+      if (transfers.length === 0) {
+        showToast('Everyone is already settled up');
+        return;
+      }
+      const lines = transfers.map((t) => `• ${t.from} pays ${t.to}: ${state.currency}${t.amount.toFixed(2)}`);
+      copyText(`Ledger Settlement Plan:\n${lines.join('\n')}`, 'Settlement plan copied');
+    });
+
+    filterChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        state.activeCategoryFilter = chip.getAttribute('data-filter') || 'ALL';
+        filterChips.forEach((c) => {
+          const active = c.getAttribute('data-filter') === state.activeCategoryFilter;
+          c.className = active
+            ? 'filter-chip px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-900 text-white transition'
+            : 'filter-chip px-2.5 py-1 rounded-md text-xs font-medium text-zinc-600 hover:bg-zinc-200/60 transition';
+        });
+        renderExpenseLog();
+      });
+    });
+
+    searchLedgerInput.addEventListener('input', () => {
+      state.searchQuery = searchLedgerInput.value.trim();
+      renderExpenseLog();
+    });
+
+    clearLogBtn.addEventListener('click', () => {
+      state.expenses = [];
+      persistState();
+      renderExpenseLog();
+      showToast('Cleared expense log');
+    });
+
+    exportCsvBtn.addEventListener('click', () => {
+      if (state.expenses.length === 0) {
+        showToast('No expenses to export');
+        return;
+      }
+      const headers = ['Workspace', 'Title', 'Category', 'Paid By', 'Split Mode', 'Subtotal', 'Discount', 'Tax %', 'Net Total', 'People', 'Per Share'];
+      const wsName = state.workspaces[state.activeWorkspaceId]?.name || 'Ledger';
+      const rows = state.expenses.map((it) => [
+        `"${String(wsName).replace(/"/g, '""')}"`,
+        `"${String(it.title).replace(/"/g, '""')}"`,
+        `"${it.category || 'Dining'}"`,
+        `"${it.paidBy || ''}"`,
+        `"${it.splitMode || 'equal'}"`,
+        it.baseAmount.toFixed(2),
+        (it.discountAmount || 0).toFixed(2),
+        it.tipPercent,
+        it.totalAmount.toFixed(2),
+        it.people,
+        it.perPerson.toFixed(2)
+      ]);
+      const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ledger-expenses.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Exported CSV');
+    });
+
+    // Initial render
+    renderWorkspacesBar();
+    renderMembersBar();
+    updateCurrencySymbols();
+    updateTipButtonStyles(false);
+    updateSplitModeStyles();
+    updateRoundButtonStyles();
+  </script>
+</body>
+</html>
