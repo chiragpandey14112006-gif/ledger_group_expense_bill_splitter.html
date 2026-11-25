@@ -3,5 +3,10 @@ cd ledger_group_expense_bill_splitter.html
 Open ledger_group_expense_bill_splitter.html directly in any modern browser, or run a local static server:python3 -m http.server 8000
 Then visit http://localhost:8000/ledger_group_expense_bill_splitter.html.Deploy to GitHub PagesRename ledger_group_expense_bill_splitter.html to index.html (or keep the filename and link directly to it).Push the files to https://github.com/chiragpandey14112006-gif/ledger_group_expense_bill_splitter.html.In your repository, go to Settings → Pages, choose the main branch and / (root) directory, and click Save.Your live app will be available at https://chiragpandey14112006-gif.github.io/ledger_group_expense_bill_splitter.html/.Tech StackMarkup & Print Styles: Single-file HTML5 with @media print statement formattingStyling: Tailwind CSS (3.4.17 via CDN)Typography: Inter (UI) & JetBrains Mono (tabular numerals via Google Fonts)Logic & Persistence: Vanilla JavaScript (ES6+) with browser localStorage (ledger_pro_state_v5)Project Structure.
 ├── ledger_group_expense_bill_splitter.html   # Complete self-contained web application
-└── README.md                                 # Project documentation
+└── README.md                                
+<img width="1888" height="1077" alt="{C2141CDF-DFF9-463E-AF20-725D3010E2A8}" src="https://github.com/user-attachments/assets/91f609c7-5bb3-4c20-be91-d54ab018be05" />
+<img width="1881" height="1061" alt="{A5A9D216-8B7E-446D-8949-03E73FB4CA38}" src="https://github.com/user-attachments/assets/8bd6e26f-34a2-46d3-9c8f-433206da8aa7" />
+<img width="1887" height="1069" alt="{C6B3EB68-262D-4F7B-9610-9BA7DCABD85C}" src="https://github.com/user-attachments/assets/447d6c2e-e3ac-49b1-8e63-da7806b62b5f" />
+
+# Project documentation
 AuthorBuilt by @chiragpandey14112006-gif.LicenseThis project is open source and available under the MIT License.
